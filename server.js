@@ -28,8 +28,8 @@ app.get('/api/scores', async (req, res) => {
   try {
     const data = await fs.readFile(LEADERBOARD_FILE, 'utf8');
     const scores = JSON.parse(data);
-    // Sort by delta (highest first)
-    scores.sort((a, b) => b.delta - a.delta);
+    // Sort by Round 2 score descending
+    const sortedScores = scores.sort((a, b) => b.round2Score - a.round2Score);
     res.json(scores);
   } catch (error) {
     console.error('Error reading scores:', error);

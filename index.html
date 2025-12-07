@@ -14,6 +14,22 @@
     
     <!-- Babel Standalone for JSX transformation -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+      /* Prevent text selection during rapid tapping */
+      button {
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+      /* Better touch targets for mobile */
+      @media (max-width: 640px) {
+        button {
+          min-height: 80px;
+        }
+      }
+    </style>
 </head>
 <body>
     <div id="root">
@@ -28,7 +44,7 @@
             document.getElementById('root').innerHTML = '<div style="padding: 20px; text-align: center; color: red;"><h1>Error: React not loaded</h1><p>Please check your internet connection and refresh the page.</p></div>';
             throw new Error('React or ReactDOM not loaded');
         }
-        const { useState, useEffect, useRef } = React;
+        const { useState, useEffect, useRef, useCallback } = React;
 
         /**
          * ABEffortGame - A behavioral economics demo game
@@ -60,7 +76,7 @@
           const timerRef = useRef(null);
 
           /**
-           * Handles key press events during active rounds.
+           * Handles key/button press - shared logic for both keyboard and button clicks
            * 
            * Alternation logic:
            * - Only A and B keys are valid (case-insensitive)
@@ -69,37 +85,46 @@
            * - The first key press doesn't count; we need a complete alternation to score
            * - Repeated keys (A→A or B→B) are ignored
            */
+          const handleKeyPress = useCallback((key) => {
+            if (!isRoundActive) return;
+            
+            const upperKey = key.toUpperCase();
+            
+            // Only process A and B keys
+            if (upperKey !== 'A' && upperKey !== 'B') return;
+            
+            // Use functional updates to avoid stale closure issues
+            setPreviousKey(prevKey => {
+              // Check for valid alternation
+              // Only increment if we have a previous key AND it's different (complete alternation)
+              if (prevKey !== null && prevKey !== upperKey) {
+                // Valid alternation: increment score and update previous key
+                setScore(prev => prev + 1);
+                return upperKey;
+              } else if (prevKey === null) {
+                // First key press: just set previousKey, don't increment score
+                return upperKey;
+              }
+              // If prevKey === upperKey, it's a repeat, so we ignore it and return same key
+              return prevKey;
+            });
+          }, [isRoundActive]);
+
+          /**
+           * Keyboard event handler
+           */
           useEffect(() => {
             if (!isRoundActive) return;
 
-            const handleKeyPress = (event) => {
-              const key = event.key.toUpperCase();
-              
-              // Only process A and B keys
-              if (key !== 'A' && key !== 'B') return;
-              
-              // Use functional updates to avoid stale closure issues
-              setPreviousKey(prevKey => {
-                // Check for valid alternation
-                // Only increment if we have a previous key AND it's different (complete alternation)
-                if (prevKey !== null && prevKey !== key) {
-                  // Valid alternation: increment score and update previous key
-                  setScore(prev => prev + 1);
-                  return key;
-                } else if (prevKey === null) {
-                  // First key press: just set previousKey, don't increment score
-                  return key;
-                }
-                // If prevKey === key, it's a repeat, so we ignore it and return same key
-                return prevKey;
-              });
+            const handleKeyboardPress = (event) => {
+              handleKeyPress(event.key);
             };
 
-            window.addEventListener('keydown', handleKeyPress);
+            window.addEventListener('keydown', handleKeyboardPress);
             return () => {
-              window.removeEventListener('keydown', handleKeyPress);
+              window.removeEventListener('keydown', handleKeyboardPress);
             };
-          }, [isRoundActive]);
+          }, [isRoundActive, handleKeyPress]);
 
           /**
            * Timer management:
@@ -318,6 +343,33 @@
                     {timeRemaining}s
                   </div>
                 </div>
+
+                {/* A and B Buttons (for mobile/touch users) */}
+                {isRoundActive && (
+                  <div className="mb-6 flex gap-4 justify-center">
+                    <button
+                      onClick={() => handleKeyPress('A')}
+                      className="flex-1 max-w-xs py-8 px-6 bg-red-500 hover:bg-red-600 active:bg-red-700 text-white text-4xl font-bold rounded-xl shadow-lg transition-all transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
+                      disabled={!isRoundActive}
+                    >
+                      A
+                    </button>
+                    <button
+                      onClick={() => handleKeyPress('B')}
+                      className="flex-1 max-w-xs py-8 px-6 bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white text-4xl font-bold rounded-xl shadow-lg transition-all transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
+                      disabled={!isRoundActive}
+                    >
+                      B
+                    </button>
+                  </div>
+                )}
+
+                {/* Instructions for buttons */}
+                {!isRoundActive && (
+                  <div className="mb-6 text-center text-sm text-gray-500">
+                    Use keyboard A/B keys or tap the buttons above when the round starts
+                  </div>
+                )}
 
                 {/* Round summary (shown when round completes) */}
                 {roundComplete && (
